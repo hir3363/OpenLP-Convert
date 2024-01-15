@@ -95,14 +95,25 @@ Public Function GetVersesFromSong(song As String) As String[]
 
   Dim lines As String[] = Split(song, Chr(10))
   Dim verses As String[]
+  Dim CurVerse as String
 
+  
   For i = 1 To lines.Count - 1 ' Skip the title line
     ' Skip empty lines
+    
     If Len(Trim(lines[i])) > 0 Then
-      verses.Add(lines[i])
+        
+      CurVerse &= lines[i] & Chr(10)
+    else
+      'new verse
+      if curVerse <> "" then 'add verse
+        verses.add(CurVerse)
+      endif
+        CurVerse = ""
+
     Endif
   Next
-
+  if CurVerse <> "" then verses.add(CurVerse) 'add last verse 
   Return verses
 
 End
