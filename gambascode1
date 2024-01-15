@@ -1,0 +1,121 @@
+Public Structure Song
+  Public title As String
+  Public verses As String[]
+End
+
+Public Sub btnConvert_Click()
+
+  Dim folderPath As String = RequestFile("Select folder containing Word files", "*.doc;*.docx")
+
+  For Each file As String In GetFilenames(folderPath, "*.doc;*.docx")
+    Dim songs As Song[] = ProcessWordFile(file)
+
+    ' Create output folder (remove if exists)
+    Dim outputFolder As String = GetFilePart(file) & "-songs"
+    If ExistDirectory(outputFolder) Then
+      RemoveDirectory(outputFolder)
+    Endif
+    CreateDirectory(outputFolder)
+
+    ' Save each song to a separate text file
+    For Each song As Song In songs
+      Dim filename As String = outputFolder & "/" & song.title & ".txt"
+      SaveSongToFile(song, filename)
+    Next
+
+  Next
+
+  MsgBox "Songs saved to their respective text files!"
+
+End
+
+Public Sub ProcessWordFile(filePath As String) As Song[]
+
+  ' Load Word document using LibreOffice headless
+  Dim lo As Object = CreateUnoService("com.sun.star.ServiceManager")
+  Dim desktop As Object = lo.createInstance("com.sun.star.frame.Desktop")
+  Dim doc As Object = desktop.loadComponentFromURL(filePath, "_blank", 0, Array())
+  Dim text As String = doc.getText()
+
+  ' Split text into songs
+  Dim songs As String[] = SplitTextIntoSongs(text)
+
+  Dim songStructures As Song[]
+
+  For Each song As String In songs
+    Dim songStructure As New Song
+    songStructure.title = GetTitleFromSong(song)
+    songStructure.verses = GetVersesFromSong(song)
+    songStructures.Add(songStructure)
+  Next
+
+  Return songStructures
+
+End
+
+Public Function SplitTextIntoSongs(text As String) As String[]
+
+  Dim songs As String[]
+  Dim currentSong As String
+
+  For i As Integer = 1 To Len(text) ' Iterate through lines using line numbers
+    Dim line As String = GetLine(text, i)
+    line = Trim(line) ' Trim whitespace
+
+    If Len(line) = 0 Then ' Empty line
+      ' Skip empty lines
+    ElseIf (i = 1 And Len(Trim(GetLine(text, i + 1))) = 0) Or _
+           (Len(Trim(GetLine(text, i - 1))) = 0 And Len(Trim(GetLine(text, i + 1))) = 0) Then
+                ' Isolated line (first line or other isolated lines)
+      If currentSong <> "" Then ' End of previous song
+        songs.Add(currentSong)
+        currentSong = ""
+      Endif
+      songs.Add(line) ' Add isolated line as a song
+    Else ' Non-isolated line
+      currentSong &= line & Chr(10) ' Add line to current song
+    Endif
+  Wend
+
+  If currentSong <> "" Then ' Save last song
+    songs.Add(currentSong)
+  Endif
+
+  Return songs
+
+End
+Public Function GetTitleFromSong(song As String) As String
+
+  Dim lines As String[] = Split(song, Chr(10))
+  Return lines[0] ' Title is always the first line
+
+End
+
+Public Function GetVersesFromSong(song As String) As String[]
+
+  Dim lines As String[] = Split(song, Chr(10))
+  Dim verses As String[]
+
+  For i = 1 To lines.Count - 1 ' Skip the title line
+    ' Skip empty lines
+    If Len(Trim(lines[i])) > 0 Then
+      verses.Add(lines[i])
+    Endif
+  Next
+
+  Return verses
+
+End
+
+Public Sub SaveSongToFile(song As Song, filename As String)
+
+  Dim file As File = Create Text File(filename)
+  Write #file, song.title & Chr(10) ' Write title
+
+  ' Write verses with double blank lines between them
+  For Each verse As String In song.verses
+    Write #file, Chr(10) & Chr(10) & verse & Chr(10)
+  Next
+
+  Close file
+
